@@ -1,9 +1,9 @@
-Route,Customer,Commodity,Quantity,Laycan Start,Laycan End,Load Port,Loading Terms (MT),Loading Terms Turn Time,Discharge Port,Discharge Terms (MT),Discharge Terms Turn Time,Port Cost,Commission
-Australia - China (Iron Ore),Rio Tinto,Iron Ore,170000 MT +/- 10% MOLOO,2026-03-12,2026-03-18,"Dampier, Australia",80000,PWWD SHINC+ 12 hr,"Qingdao, China",30000,PWWD SHINC+ 24 hr,USD 240K total (load & discharge),3.75% due to charterer
-Brazil - China (Iron Ore),Vale,Iron Ore,190000 MT +/- 10% MOLOO,2026-04-03,2026-04-10,"Ponta da Madeira, Brazil",60000,PWWD SHINC+ 12 hr,"Caofeidian, China",30000,PWWD SHINC+ 24 hr,USD 75K load / USD 95K discharge,3.75% due to charterer
-South Africa - China (Iron Ore),Anglo American,Iron Ore,180000 MT +/- 10% MOLOO,2026-03-15,2026-03-22,"Saldanha Bay, South Africa",55000,PWWD SHINC+ 6 hr,"Tianjin, China",25000,PWWD SHINC+ 24 hr,USD 180K total,3.75% due to charterer
-Indonesia - India (Coal),Adaro,Thermal Coal,150000 MT +/- 10% MOLOO,2026-04-10,2026-04-15,"Taboneo, Indonesia",35000,PWWD SHINC+ 12 hr,"Krishnapatnam, India",25000,PWWD SHINC+ 24 hr,USD 90K total,2.50% due to broker
-Canada - China (Coking Coal),Teck Resources,Coking Coal,160000 MT +/- 10% MOLOO,2026-03-18,2026-03-26,"Vancouver, Canada",45000,PWWD SHINC+ 12 hr,"Fangcheng, China",25000,PWWD SHINC+ 24 hr,USD 180K at load / USD 110K at discharge,3.75% due to charterer
-West Africa - India (Bauxite),Guinea Alumina Corp,Bauxite,175000 MT +/- 10% MOLOO,2026-04-10,2026-04-18,"Kamsar, Guinea",30000,PWWD SHINCAnchorage Loading,"Mangalore, India",25000,PWWD SHINC+ 12 hr,USD 150K total,2.50% due to broker
-Australia - South Korea (Iron Ore),BHP,Iron Ore,165000 MT +/- 10% MOLOO,2026-03-09,2026-03-15,"Port Hedland, Australia",80000,PWWD SHINC+ 12 hr,"Gwangyang, South Korea",30000,PWWD SHINC+ 24 hr,USD 230K total,3.75% due to charterer
-Brazil - Malaysia (Iron Ore),Vale Malaysia,Iron Ore,180000 MT +/- 10% MOLOO,2026-03-25,2026-04-02,"Tubarão, Brazil",60000,PWWD SHINC+ 6 hr,"Teluk Rubiah, Malaysia",25000,PWWD SHINC+ 24 hr,USD 85K load / USD 80K discharge,3.75% due to charterer
+Route,Customer,Commodity,Quantity,Laycan Start,Laycan End,Load Port,Loading Terms (MT),Loading Terms Turn Time,Discharge Port,Discharge Terms (MT),Discharge Terms Turn Time,Port Cost,Commission,Commission To
+Australia - China (Iron Ore),Rio Tinto,Iron Ore,170000,12/3/2026,18/3/2026,DAMPIER,80000,12,QINGDAO,30000,24,240000,0.0375,charterer
+Brazil - China (Iron Ore),Vale,Iron Ore,190000,3/4/2026,10/4/2026,PONTA DA MADEIRA,60000,12,CAOFEIDIAN,30000,24,170000,0.0375,charterer
+South Africa - China (Iron Ore),Anglo American,Iron Ore,180000,15/3/2026,22/3/2026,SALDANHA BAY,55000,6,TIANJIN,25000,24,180000,0.0375,charterer
+Indonesia - India (Coal),Adaro,Thermal Coal,150000,10/4/2026,15/4/2026,TABONEO,35000,12,KRISHNAPATNAM,25000,24,90000,0.025,broker
+Canada - China (Coking Coal),Teck Resources,Coking Coal,160000,18/3/2026,26/3/2026,VANCOUVER (CANADA),45000,12,FANGCHENG,25000,24,290000,0.0375,charterer
+West Africa - India (Bauxite),Guinea Alumina Corp,Bauxite,175000,10/4/2026,18/4/2026,PORT KAMSAR,30000,0,MANGALORE,25000,12,150000,0.025,broker
+Australia - South Korea (Iron Ore),BHP,Iron Ore,165000,9/3/2026,15/3/2026,PORT HEDLAND,80000,12,GWANGYANG,30000,24,230000,0.0375,charterer
+Brazil - Malaysia (Iron Ore),Vale Malaysia,Iron Ore,180000,25/3/2026,2/4/2026,TUBARAO,60000,6,TELUK RUBIAH,25000,24,165000,0.0375,charterer

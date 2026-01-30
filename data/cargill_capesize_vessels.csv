@@ -1,5 +1,5 @@
-Vessel Name,DWT (MT),Hire Rate (USD/day),Warranted Speed Laden (kn),Warranted Speed Laden VLSF (mt),Warranted Speed Laden MGO (mt),Warranted Speed Ballast (kn),Warranted Speed Ballast VLSF (mt),Warranted Speed Ballast MGO (mt),Economical Speed Laden (kn),Economical Speed Laden VLSF (mt),Economical Speed Laden MGO (mt),Economical Speed Ballast (kn),Economical Speed Ballast VLSF (mt),Economical Speed Ballast MGO (mt),Port Consumption Idle VLSF (mt/day),Port Consumption Working VLSF (mt/day),Discharge Port,ETD,Bunker Remaining VLSF (mt),Bunker Remaining MGO (mt)
-ANN BELL,180803,11750,13.5,60,2.0,14.5,55,2.0,12.0,42,2.0,12.5,38,2.0,2.0,3.0,"Qingdao, China",2026-02-25,401.3,45.1
-OCEAN HORIZON,181550,15750,13.8,61,1.8,14.8,56.5,1.8,12.3,43.0,1.8,12.8,39.5,1.8,1.8,3.2,"Map Ta Phut, Thailand",2026-03-01,265.8,64.3
-PACIFIC GLORY,182320,14800,13.5,59,1.9,14.2,54,1.9,12.2,44,1.9,12.7,40,1.9,2.0,3.0,"Gwangyang, S. Korea",2026-03-10,601.9,98.1
-GOLDEN ASCENT,179965,13950,13.0,58,2.0,14.0,53,2.0,11.8,41,2.0,12.3,37,2.0,1.9,3.1,"Fangcheng, China",2026-03-08,793.3,17.1
+Vessel Name,DWT (MT),Hire Rate (USD/day),Warranted Speed Laden (kn),Warranted Speed Laden VLSF (mt),Warranted Speed Laden MGO (mt),Warranted Speed Ballast (kn),Warranted Speed Ballast VLSF (mt),Warranted Speed Ballast MGO (mt),Economical Speed Laden (kn),Economical Speed Laden VLSF (mt),Economical Speed Laden MGO (mt),Economical Speed Ballast (kn),Economical Speed Ballast VLSF (mt),Economical Speed Ballast MGO (mt),Port Consumption Idle MGO (mt/day),Port Consumption Working MGO (mt/day),Discharge Port,ETD,Bunker Remaining VLSF (mt),Bunker Remaining MGO (mt)
+ANN BELL,180803,11750,13.5,60,2,14.5,55,2,12,42,2,12.5,38,2,2,3,QINGDAO,25/2/2026,401.3,45.1
+OCEAN HORIZON,181550,15750,13.8,61,1.8,14.8,56.5,1.8,12.3,43,1.8,12.8,39.5,1.8,1.8,3.2,MAP TA PHUT,1/3/2026,265.8,64.3
+PACIFIC GLORY,182320,14800,13.5,59,1.9,14.2,54,1.9,12.2,44,1.9,12.7,40,1.9,2,3,GWANGYANG,10/3/2026,601.9,98.1
+GOLDEN ASCENT,179965,13950,13,58,2,14,53,2,11.8,41,2,12.3,37,2,1.9,3.1,FANGCHENG,8/3/2026,793.3,17.1
