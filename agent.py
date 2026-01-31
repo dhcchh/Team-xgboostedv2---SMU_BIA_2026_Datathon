@@ -14,7 +14,7 @@ from langchain.tools import tool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
 
-from backend import Cargo, Ship, TCECalculator
+from backend import Cargo, Ship, TCECalculator, PortDelayTCECalculator, VLSFIncreaseTCECalculator
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -28,20 +28,20 @@ SYSTEM_PROMPT = (
 
 
 def _load_fleet_and_cargos(
-    cargill_vessels_path: str = "data/cargill_capesize_vessels.csv",
-    market_vessels_path: str = "data/market_vessels.csv",
-    cargill_cargos_path: str = "data/cargill_committed_cargoes.csv",
-    market_cargos_path: str = "data/market_cargoes.csv",
+        cargill_vessels_path: str = "data/cargill_capesize_vessels.csv",
+        market_vessels_path: str = "data/market_vessels.csv",
+        cargill_cargos_path: str = "data/cargill_committed_cargoes.csv",
+        market_cargos_path: str = "data/market_cargoes.csv",
 ) -> Tuple[List[Ship], List[Ship], List[Cargo], List[Cargo]]:
-    cargill_vessels = [Ship(row) for _, row in pd.read_csv(cargill_vessels_path).iterrows()]
-    market_vessels = [Ship(row) for _, row in pd.read_csv(market_vessels_path).iterrows()]
-    cargill_cargos = [Cargo(row) for _, row in pd.read_csv(cargill_cargos_path).iterrows()]
+    cargill_vessels = [Ship(row, market=False) for _, row in pd.read_csv(cargill_vessels_path).iterrows()]
+    market_vessels = [Ship(row, market=True) for _, row in pd.read_csv(market_vessels_path).iterrows()]
+    cargill_cargos = [Cargo(row, market=False) for _, row in pd.read_csv(cargill_cargos_path).iterrows()]
     market_cargos = [Cargo(row, market=True) for _, row in pd.read_csv(market_cargos_path).iterrows()]
     return cargill_vessels, market_vessels, cargill_cargos, market_cargos
 
 
-def _compute_tce_matrix(ships: List[Ship], cargos: List[Cargo]) -> List[List[float]]:
-    calculators = [[TCECalculator(ship, cargo) for cargo in cargos] for ship in ships]
+def _compute_tce_matrix(ships: List[Ship], cargos: List[Cargo], port_delay) -> List[List[float]]:
+    calculators = [[PortDelayTCECalculator(ship, cargo, port_delay) for cargo in cargos] for ship in ships]
     return [[round(calc.calculate_TCE(), 2) for calc in row] for row in calculators]
 
 
@@ -67,9 +67,9 @@ def _parse_assignments_from_statements(vessel_statements: str) -> List[Tuple[int
 
 
 def _compute_route_breakdown(
-    ships: List[Ship],
-    cargos: List[Cargo],
-    assignments: List[Tuple[int, int]],
+        ships: List[Ship],
+        cargos: List[Cargo],
+        assignments: List[Tuple[int, int]],
 ) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     for (vi, ci) in assignments:
@@ -161,12 +161,12 @@ def _safe_json_loads(s: str) -> Dict[str, Any]:
 
 
 def _llm_route_and_market_summary(
-    *,
-    assign_table: str,
-    tce: Optional[List[List[float]]],
-    vessel_statements: str,
-    route_breakdown: List[Dict[str, Any]],
-    model: ChatOpenAI,
+        *,
+        assign_table: str,
+        tce: Optional[List[List[float]]],
+        vessel_statements: str,
+        route_breakdown: List[Dict[str, Any]],
+        model: ChatOpenAI,
 ) -> Dict[str, Any]:
     numeric = _basic_numeric_summary(tce)
 
@@ -264,10 +264,11 @@ def analyze_assignments(assign_table: str, tce: Optional[List[List[float]]] = No
 
 
 def recompute_tce(
-    hire_rate_multiplier: float = 1.0,
-    bunker_vlsf_multiplier: float = 1.0,
-    bunker_mgo_multiplier: float = 1.0,
-    scope: str = "market",
+        hire_rate_multiplier: float = 1.0,
+        bunker_vlsf_multiplier: float = 1.0,
+        bunker_mgo_multiplier: float = 1.0,
+        port_delay: int = 0,
+        scope: str = "market",
 ) -> Dict[str, Any]:
     """Recompute the TCE grid after applying multipliers; callable from app code."""
     cargill_vessels, market_vessels, cargill_cargos, market_cargos = _load_fleet_and_cargos()
@@ -291,40 +292,43 @@ def recompute_tce(
         c.disport_vlsf_price = float(getattr(c, "disport_vlsf_price", 500)) * float(bunker_vlsf_multiplier)
         c.disport_mgo_price = float(getattr(c, "disport_mgo_price", 650)) * float(bunker_mgo_multiplier)
 
-    tce_matrix = _compute_tce_matrix(all_vessels, all_cargos)
+    tce_matrix = _compute_tce_matrix(all_vessels, all_cargos, port_delay)
     assign_table = tabulate(
         tce_matrix,
         headers=list(range(len(tce_matrix[0]))) if tce_matrix else [],
         tablefmt="grid",
     )
 
+    row_ind, col_ind = linear_sum_assignment(tce_matrix, maximize=True)
+
     statements: List[str] = []
-    for i, row in enumerate(tce_matrix):
-        if not row:
-            continue
-        best_j = max(range(len(row)), key=lambda j: row[j])
-        statements.append(f"Vessel {i} -> Cargo {best_j} (TCE={row[best_j]})")
+    for i, j in zip(row_ind, col_ind):
+        if tce_matrix[i][j] == 0: continue
+        statements.append(f"{all_vessels[i].name} -> {all_cargos[j].route} (TCE={tce_matrix[i][j]})")
 
     return {"tce": tce_matrix, "assign_table": assign_table, "vessel_statements": "\n".join(statements)}
 
 
 @tool
 def recompute_tce_tool(
-    hire_rate_multiplier: float = 1.0,
-    bunker_vlsf_multiplier: float = 1.0,
-    bunker_mgo_multiplier: float = 1.0,
-    scope: str = "market",
+        hire_rate_multiplier: float = 1.0,
+        bunker_vlsf_multiplier: float = 1.0,
+        bunker_mgo_multiplier: float = 1.0,
+        port_delay: int = 0,
+        scope: str = "market",
 ) -> Dict[str, Any]:
     """Tool wrapper for recompute_tce."""
     return recompute_tce(
         hire_rate_multiplier=hire_rate_multiplier,
         bunker_vlsf_multiplier=bunker_vlsf_multiplier,
         bunker_mgo_multiplier=bunker_mgo_multiplier,
+        port_delay=port_delay,
         scope=scope,
     )
 
 
-def simulate_sensitivity(param_name: str, low: float, high: float, steps: int = 5, scope: str = "market") -> Dict[str, Any]:
+def simulate_sensitivity(param_name: str, low: float, high: float, steps: int = 5, scope: str = "market") -> Dict[
+    str, Any]:
     """Callable sensitivity sweep for app code."""
     if steps < 2:
         return {"error": "steps must be at least 2"}
@@ -337,6 +341,8 @@ def simulate_sensitivity(param_name: str, low: float, high: float, steps: int = 
             out = recompute_tce(bunker_vlsf_multiplier=float(v), scope=scope)
         elif param_name == "bunker_mgo":
             out = recompute_tce(bunker_mgo_multiplier=float(v), scope=scope)
+        elif param_name == "port_delay":
+            out = recompute_tce(port_delay=int(v))
         else:
             return {"error": f"Unsupported parameter {param_name!r}. Use hire_rate, bunker_vlsf, or bunker_mgo."}
 
@@ -353,7 +359,8 @@ def simulate_sensitivity(param_name: str, low: float, high: float, steps: int = 
 
 
 @tool
-def simulate_sensitivity_tool(param_name: str, low: float, high: float, steps: int = 5, scope: str = "market") -> Dict[str, Any]:
+def simulate_sensitivity_tool(param_name: str, low: float, high: float, steps: int = 5, scope: str = "market") -> Dict[
+    str, Any]:
     """Tool wrapper for simulate_sensitivity."""
     return simulate_sensitivity(param_name=param_name, low=low, high=high, steps=steps, scope=scope)
 
@@ -373,7 +380,8 @@ def route_insights(vessel_statements: str) -> Dict[str, Any]:
 
     total_nm = sum(float(r["total_nm"]) for r in breakdown)
     avg_ballast_share = (
-        sum(float(r["ballast_nm"]) / float(r["total_nm"]) for r in breakdown if float(r["total_nm"]) > 0) / len(breakdown)
+            sum(float(r["ballast_nm"]) / float(r["total_nm"]) for r in breakdown if float(r["total_nm"]) > 0) / len(
+        breakdown)
     )
 
     longest = max(breakdown, key=lambda r: float(r["total_nm"]))
@@ -423,9 +431,8 @@ agent = create_agent(
 
 AGENT = agent
 
+
 def chat(user_message: str, chat_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
     """Single-turn chat interface for what-if analysis in app code."""
     history = chat_history or []
     return AGENT.invoke({"input": user_message, "chat_history": history})
-
-

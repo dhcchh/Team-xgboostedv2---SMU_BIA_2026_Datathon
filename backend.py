@@ -244,10 +244,10 @@ class TCECalculator:
 
 
 class PortDelayTCECalculator(TCECalculator):
-    def __init__(self, ship, cargo):
+    def __init__(self, ship, cargo, days):
         super().__init__(ship, cargo)
         if ship.location in ('QINGDAO', 'FANGCHENG', 'LIANYUNGANG', 'CAOFEIDIAN', 'XIAMEN', 'JINGTANG'):
-            self.ship.discharge_date += timedelta(2)
+            self.ship.discharge_date += timedelta(days)
 
 
 class VLSFIncreaseTCECalculator(TCECalculator):
