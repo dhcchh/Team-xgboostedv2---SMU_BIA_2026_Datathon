@@ -132,6 +132,8 @@ def _basic_numeric_summary(tce: Optional[List[List[float]]]) -> Dict[str, Any]:
     num_cargos = len(tce[0]) if num_vessels else 0
     flat = [float(v) for row in tce for v in row if v is not None]
     flat_sorted = sorted(flat, reverse=True)
+    while flat_sorted[-1] == 0:
+        flat_sorted.pop()
 
     def _pct(v: float, p: float) -> float:
         if not v:
@@ -141,7 +143,7 @@ def _basic_numeric_summary(tce: Optional[List[List[float]]]) -> Dict[str, Any]:
     summary: Dict[str, Any] = {
         "num_vessels": num_vessels,
         "num_cargos": num_cargos,
-        "tce_avg": (sum(flat) / len(flat)) if flat else None,
+        "tce_avg": (sum(flat_sorted) / len(flat_sorted)) if flat else None,
         "tce_median": (flat_sorted[len(flat_sorted) // 2] if flat_sorted else None),
         "tce_top_five": flat_sorted[:5],
         "tce_p10": (flat_sorted[int(_pct(len(flat_sorted), 0.9))] if flat_sorted else None),

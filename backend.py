@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import copy
 import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
@@ -12,7 +13,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from scipy.sparse.csgraph import dijkstra
 from scipy.sparse import coo_matrix
 from sklearn.linear_model import LinearRegression
-
 
 _CSV_PATH = os.path.join(os.path.dirname(__file__), "data", "port_distances.csv")
 if not os.path.exists(_CSV_PATH):
@@ -46,10 +46,12 @@ for i in range(n):
 
 adj = coo_matrix(adj_arr)
 
+
 def get_distance(src, dst):
     if src not in mp or dst not in mp:
         raise KeyError(f"Unknown port(s): {src!r}, {dst!r}")
     return dijkstra(csgraph=adj, directed=True, indices=mp[src])[mp[dst]]
+
 
 # Estimate freight rate based on distance of route, using the committed cargos and baltic exchange FFA rates for C3, C5 and C7 routes
 a1 = [('KAMSAR ANCHORAGE', 'QINGDAO'), ("PORT HEDLAND", 'LIANYUNGANG'), ('ITAGUAI', 'QINGDAO')]
@@ -63,6 +65,31 @@ y2 = [19.45, 7.7, 11.21]
 
 lm = LinearRegression().fit(np.array(x1 + x2).reshape(-1, 1), y1 + y2)
 m, c = lm.coef_[0], lm.intercept_
+
+fuel_prices_df = pd.read_csv('data/bunker_forward_curve.csv')
+fuel_prices_df['Location'] = fuel_prices_df['Location'].map(lambda x: x.upper())
+fuel_prices = {}
+fuel_ports = []
+for i, row in fuel_prices_df.iterrows():
+    if row['Location'] not in fuel_prices:
+        fuel_prices[row['Location']] = {}
+        fuel_ports.append(row['Location'])
+    fuel_prices[row['Location']][row['Grade']] = row['Mar-26']
+
+
+def get_fuel_price(port):
+    """
+    Estimate the fuel price at a port by finding the closest fuel port and taking that as the price
+    :param port: The port at which we want to know the fuel price for
+    :return: The fuel price for (VLSF, MGO)
+    """
+    closest_port, dist = 0, np.inf
+    distances = dijkstra(csgraph=adj, directed=True, indices=mp[port])
+    for fuel_port in fuel_ports:
+        if distances[mp[fuel_port]] < dist:
+            dist = distances[mp[fuel_port]]
+            closest_port = fuel_port
+    return fuel_prices[closest_port]['VLSFO'], fuel_prices[closest_port]['MGO']
 
 
 def plot_distance_histogram(save_path: Optional[str] = None, bins: int = 50) -> None:
@@ -84,9 +111,12 @@ def plot_distance_histogram(save_path: Optional[str] = None, bins: int = 50) -> 
     else:
         plt.show()
 
+
 # Classes to handle TCE calculation
 class Ship:
-    def __init__(self, data):
+    def __init__(self, data, market=False):
+        self.market = market
+        self.name = data['Vessel Name']
         self.ballast_eco_spd = data['Economical Speed Ballast (kn)']
         self.ballast_max_spd = data['Warranted Speed Ballast (kn)']
         self.laden_eco_spd = data['Economical Speed Laden (kn)']
@@ -105,14 +135,15 @@ class Ship:
         self.hire_rate = data['Hire Rate (USD/day)']
         self.location = data['Discharge Port']
         self.discharge_date = datetime.strptime(data['ETD'], '%d/%m/%Y').date()
-        self.discharge_vlsf_price = 500
-        self.discharge_mgo_price = 650
+        self.discharge_vlsf_price, self.discharge_mgo_price = get_fuel_price(self.location)
         self.vlsf_left = data['Bunker Remaining VLSF (mt)']
         self.mgo_left = data['Bunker Remaining MGO (mt)']
 
 
 class Cargo:
     def __init__(self, data, market=False):
+        self.market = market
+        self.route = data['Route']
         self.qty = data['Quantity']
         self.loadport = data['Load Port']
         self.disport = data['Discharge Port']
@@ -124,13 +155,11 @@ class Cargo:
         self.discharge_tt = data['Discharge Terms Turn Time']
         self.port_cost = data['Port Cost']
         self.brkcoms = data['Commission'] if data['Commission To'] == 'broker' else 0
-        self.adcoms = data['Commission'] if data['Commission To'] == 'charterer' else 0
+        self.adcoms = data['Commission'] if data['Commission To'] == 'charterer' and market else 0
         self.laden_dist = get_distance(self.loadport, self.disport)
         self.freight_rate = m * self.laden_dist + c if market else data['Freight Rate ($/MT)']
-        self.loadport_vlsf_price = 500
-        self.loadport_mgo_price = 650
-        self.disport_vlsf_price = 500
-        self.disport_mgo_price = 650
+        self.loadport_vlsf_price, self.loadport_mgo_price = get_fuel_price(self.loadport)
+        self.disport_vlsf_price, self.disport_mgo_price = get_fuel_price(self.disport)
 
     def loadport_days(self):
         return self.qty / self.load_rate + self.load_tt / 24
@@ -144,8 +173,8 @@ class Cargo:
 
 class TCECalculator:
     def __init__(self, ship, cargo):
-        self.ship = ship
-        self.cargo = cargo
+        self.ship = copy.deepcopy(ship)
+        self.cargo = copy.deepcopy(cargo)
         self.ballast_dist = get_distance(ship.location, cargo.loadport)
         self.laden_dist = cargo.laden_dist
         self.total_days = 0
@@ -197,20 +226,13 @@ class TCECalculator:
     def port_fuel_costs(self):
         return self.cargo.loadport_days() * self.ship.port_working_mgo * self.cargo.loadport_mgo_price
 
-    def total_costs(self):
-        sea_fuel_costs, steaming_days = self.sea_fuel_costs()
-        self.total_days = max(steaming_days + self.cargo.loadport_days() + self.cargo.disport_days(),
-                              (self.cargo.laycan_start - self.ship.discharge_date).days)
-        return sea_fuel_costs + self.port_fuel_costs() + self.total_days * self.ship.hire_rate * (
-                1 - self.cargo.adcoms) + self.cargo.port_cost
-
     def calculate_TCE(self):
+        if self.ship.market and self.cargo.market: return 0
         best_TCE = 0
         for (sea_fuel_cost, steaming_days) in self.sea_fuel_costs():
             if sea_fuel_cost == np.inf: continue
             total_days = steaming_days + self.cargo.loadport_days() + self.cargo.disport_days()
-            total_cost = sea_fuel_cost + self.port_fuel_costs() + self.cargo.port_cost + total_days * self.ship.hire_rate * (
-                        1 - self.cargo.adcoms)
+            total_cost = sea_fuel_cost + self.port_fuel_costs() + self.cargo.port_cost
             current_TCE = (self.cargo.total_revenue() - total_cost) / total_days
             if current_TCE > best_TCE:
                 best_TCE = current_TCE
@@ -219,3 +241,17 @@ class TCECalculator:
 
     def arrival_date(self):
         return self.ship.discharge_date + self.total_days
+
+
+class PortDelayTCECalculator(TCECalculator):
+    def __init__(self, ship, cargo):
+        super().__init__(ship, cargo)
+        if ship.location in ('QINGDAO', 'FANGCHENG', 'LIANYUNGANG', 'CAOFEIDIAN', 'XIAMEN', 'JINGTANG'):
+            self.ship.discharge_date += timedelta(2)
+
+
+class VLSFIncreaseTCECalculator(TCECalculator):
+    def __init__(self, ship, cargo):
+        super().__init__(ship, cargo)
+        self.ship.discharge_vlsf_price *= 1.1
+        self.cargo.loadport_vlsf_price *= 1.1

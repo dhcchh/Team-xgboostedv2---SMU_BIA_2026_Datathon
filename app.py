@@ -14,10 +14,8 @@ import agent
 from backend import Cargo, Ship, TCECalculator
 from langchain_core.messages import HumanMessage, AIMessage
 
-
 st.set_page_config(page_title="Voyage Optimizer", layout="wide")
 st.title("Voyage Optimizer")
-
 
 if "results_ready" not in st.session_state:
     st.session_state.results_ready = False
@@ -36,7 +34,6 @@ if "whatif_history" not in st.session_state:
 
 if "whatif_seeded" not in st.session_state:
     st.session_state.whatif_seeded = False
-
 
 col1, col2 = st.columns(2)
 with col1:
@@ -69,8 +66,7 @@ def _compute_best_breakdown(ship: Ship, cargo: Cargo) -> Dict[str, float]:
             continue
 
         port_fuel = float(calc.port_fuel_costs())
-        hire_cost = float(total_days * ship.hire_rate * (1 - cargo.adcoms))
-        total_cost = float(sea_fuel_cost) + port_fuel + float(cargo.port_cost) + hire_cost
+        total_cost = float(sea_fuel_cost) + port_fuel + float(cargo.port_cost)
         revenue = float(cargo.total_revenue())
         tce = (revenue - total_cost) / total_days
 
@@ -79,7 +75,6 @@ def _compute_best_breakdown(ship: Ship, cargo: Cargo) -> Dict[str, float]:
             best = {
                 "sea_fuel_usd": float(sea_fuel_cost),
                 "port_fuel_usd": float(port_fuel),
-                "hire_cost_usd": float(hire_cost),
                 "port_cost_usd": float(cargo.port_cost),
                 "revenue_usd": float(revenue),
                 "total_cost_usd": float(total_cost),
@@ -274,11 +269,10 @@ def _render_llm_and_outputs(llm_payload: Dict[str, Any], opt: Dict[str, Any]) ->
 
         with chart_col1:
             fig, ax = plt.subplots(figsize=(4.8, 2.8))
-            labels_cost = ["Sea Fuel", "Port Fuel", "Hire", "Port Cost"]
+            labels_cost = ["Sea Fuel", "Port Fuel", "Port Cost"]
             costs = [
                 breakdown.get("sea_fuel_usd", 0.0),
                 breakdown.get("port_fuel_usd", 0.0),
-                breakdown.get("hire_cost_usd", 0.0),
                 breakdown.get("port_cost_usd", 0.0),
             ]
             revenue = breakdown.get("revenue_usd", 0.0)
@@ -309,10 +303,10 @@ def _render_llm_and_outputs(llm_payload: Dict[str, Any], opt: Dict[str, Any]) ->
 
         if not st.session_state.whatif_seeded:
             context = (
-                "Optimization context:\n\n"
-                f"Vessel statements:\n{opt.get('vessel_statements', '')}\n\n"
-                "Assignment table (head):\n"
-                + "\n".join(opt.get("assign_table", "").splitlines()[:12])
+                    "Optimization context:\n\n"
+                    f"Vessel statements:\n{opt.get('vessel_statements', '')}\n\n"
+                    "Assignment table (head):\n"
+                    + "\n".join(opt.get("assign_table", "").splitlines()[:12])
             )
             st.session_state.whatif_history.append(HumanMessage(content=context))
             st.session_state.whatif_seeded = True
@@ -348,20 +342,22 @@ def _render_llm_and_outputs(llm_payload: Dict[str, Any], opt: Dict[str, Any]) ->
 
 
 if process_start:
-    with st.spinner("Processing data and running optimization..."):
+    with ((((st.spinner("Processing data and running optimization..."))))):
         try:
             df_cargill_vessels = _read_csv(cargill_vessels_file, "data/cargill_capesize_vessels.csv")
             df_market_vessels = _read_csv(market_vessels_file, "data/market_vessels.csv")
             df_cargill_cargos = _read_csv(cargill_cargos_file, "data/cargill_committed_cargoes.csv")
             df_market_cargos = _read_csv(market_cargos_file, "data/market_cargoes.csv")
 
-            cargill_vessels = [Ship(row) for _, row in df_cargill_vessels.iterrows()]
-            market_vessels = [Ship(row) for _, row in df_market_vessels.iterrows()]
-            for vessel in market_vessels:
-                vessel.hire_rate = 15000
+            cargill_vessels = [Ship(row, market=False) for _, row in df_cargill_vessels.iterrows()]
+            market_vessels = [Ship(row, market=True) for _, row in df_market_vessels.iterrows()]
+            vessel_names = [ship.name + '(Cargill)' for ship in cargill_vessels] + [ship.name + '(Market)' for ship in
+                                                                                    market_vessels]
 
-            cargill_cargos = [Cargo(row) for _, row in df_cargill_cargos.iterrows()]
+            cargill_cargos = [Cargo(row, market=False) for _, row in df_cargill_cargos.iterrows()]
             market_cargos = [Cargo(row, market=True) for _, row in df_market_cargos.iterrows()]
+            cargo_routes = [cargo.route + '(Cargill)' for cargo in cargill_cargos] + [cargo.route + '(Market)' for cargo
+                                                                                      in market_cargos]
 
             all_vessels = cargill_vessels + market_vessels
             all_cargos = cargill_cargos + market_cargos
@@ -378,13 +374,13 @@ if process_start:
 
             vessel_statements = ""
             for i, j in zip(row_ind, col_ind):
-                if tce[i][j] is not None:
-                    vessel_type = "(Cargill)" if i < len(cargill_vessels) else "(Market)"
-                    vessel_statements += f"Vessel {i} {vessel_type} should carry cargo {j} with a TCE of {tce[i][j]}\n"
+                if tce[i][j] != 0:
+                    vessel_statements += f"{vessel_names[i]} is assigned {cargo_routes[j]} with a TCE of {tce[i][j]}\n"
 
             assignments: List[Tuple[int, int]] = list(zip(row_ind, col_ind))
             rows: List[Dict[str, Any]] = []
             for k, (vi, ci) in enumerate(assignments, start=1):
+                if tce[vi][ci] == 0: continue
                 ship = all_vessels[vi]
                 cargo = all_cargos[ci]
                 breakdown = _compute_best_breakdown(ship, cargo)
