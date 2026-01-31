@@ -86,7 +86,3 @@ Four. Use the “What-If Analysis Chatbot” to explore sensitivity scenarios.
 * `agent.py`: LLM summary toolchain and what-if analysis agent.
 * `backend.py`: domain models and TCE calculations.
 * `data/`: sample CSV inputs used as fallbacks when no uploads are provided.
-
-## License
-
-Add your license information here.
