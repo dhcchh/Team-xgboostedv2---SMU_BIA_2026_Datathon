@@ -2,6 +2,11 @@
 
 A Streamlit application that optimizes vessel-to-cargo assignments using a TCE-based matrix and the Hungarian algorithm, then provides an LLM-generated narrative summary and an interactive "what-if" chatbot for sensitivity analysis.
 
+Done by: 
+* Toh Zhengfeng (AI Chatbot Application)
+* Lew Choon Hean (Optimisation Algorithm & Troubleshooting)
+* Chan Ding Hao (Understanding & Documenting business requirements, troubleshooting)
+
 ## Features
 
 - Upload vessel and cargo datasets, then run an optimization pipeline.
